@@ -1,4 +1,19 @@
-import "./style.css";
+import './style.css';
+import { EventEmitter } from './event-emitter';
+
+const eventEmitter = new EventEmitter();
+
+eventEmitter.on('click', (data: { name: string; value: number }) => {
+  console.log(data, '1');
+});
+
+eventEmitter.on('click', (data: { name: string; value: number }) => {
+  console.log(data, '2');
+});
+
+eventEmitter.emit('click', { name: 'John' });
+eventEmitter.emit('click', { name: 'John' });
+eventEmitter.emit('click', { name: 'John' });
 
 type TodoItem = {
   id: string;
@@ -7,21 +22,26 @@ type TodoItem = {
 };
 
 type Sort = {
-  text: "ask" | "desc" | "none";
+  text: 'ask' | 'desc' | 'none';
 };
+
+const eventBus: EventEmitter<{
+  'todoList:changed': void;
+  'sort:changed': void;
+}> = new EventEmitter();
 
 class Store {
   public todoList: TodoItem[] = [];
   public sort: Sort = {
-    text: "none",
+    text: 'none',
   };
 
   get sortedTodos() {
     return [...this.todoList].sort((a, b) => {
       switch (this.sort.text) {
-        case "ask":
+        case 'ask':
           return a.text.localeCompare(b.text);
-        case "desc":
+        case 'desc':
           return b.text.localeCompare(a.text);
         default:
           return 0;
@@ -36,22 +56,19 @@ class Store {
       completed: false,
     });
 
-    counterView.renderCounter();
-    todoView.renderTodoList();
+    eventBus.emit('todoList:changed');
   }
 
   removeTodo(id: string) {
     this.todoList = this.todoList.filter((todo) => todo.id !== id);
 
-    counterView.renderCounter();
-    todoView.renderTodoList();
+    eventBus.emit('todoList:changed');
   }
 
   updateSort(sort: Sort) {
     this.sort = sort;
 
-    counterView.renderCounter();
-    todoView.renderTodoList();
+    eventBus.emit('sort:changed');
   }
 }
 
@@ -60,49 +77,53 @@ const store = new Store();
 class CounterView {
   constructor() {
     this.renderCounter();
+
+    eventBus.on('todoList:changed', () => {
+      this.renderCounter();
+    });
   }
   renderCounter() {
-    const counterContainer = document.getElementById("counter")!;
+    const counterContainer = document.getElementById('counter')!;
 
     counterContainer.innerHTML = `count is ${store.todoList.length}`;
   }
 }
-const counterView = new CounterView();
+new CounterView();
 
 class TodoView {
   private todoContainer: HTMLDivElement;
 
   constructor() {
-    this.todoContainer = document.querySelector(".todo-list") as HTMLDivElement;
-    const input = this.todoContainer.querySelector(
-      "#todoInput"
-    ) as HTMLInputElement;
-    const button = this.todoContainer.querySelector(
-      "#addButton"
-    ) as HTMLButtonElement;
+    this.todoContainer = document.querySelector('.todo-list') as HTMLDivElement;
+    const input = this.todoContainer.querySelector('#todoInput') as HTMLInputElement;
+    const button = this.todoContainer.querySelector('#addButton') as HTMLButtonElement;
 
-    button.addEventListener("click", () => {
+    button.addEventListener('click', () => {
       const text = input.value.trim();
-      if (text !== "") {
-        console.log(store, "store");
+      if (text !== '') {
+        console.log(store, 'store');
         store.addTodo(text);
-        input.value = "";
+        input.value = '';
       }
     });
 
-    this.todoContainer.addEventListener("click", (e) => {
-      if (
-        e.target instanceof HTMLButtonElement &&
-        e.target.classList.contains("deleteBtn")
-      ) {
+    this.todoContainer.addEventListener('click', (e) => {
+      if (e.target instanceof HTMLButtonElement && e.target.classList.contains('deleteBtn')) {
         const id = e.target.dataset.id!;
         store.removeTodo(id);
       }
     });
+
+    eventBus.on('todoList:changed', () => {
+      this.renderTodoList();
+    });
+    eventBus.on('sort:changed', () => {
+      this.renderTodoList();
+    });
   }
 
   renderTodoList() {
-    const todoListContainer = this.todoContainer.querySelector(".list")!;
+    const todoListContainer = this.todoContainer.querySelector('.list')!;
 
     const renderTodo = (todo: TodoItem) => `
       <div>
@@ -111,24 +132,22 @@ class TodoView {
       </div>
     `;
 
-    todoListContainer.innerHTML = store.sortedTodos.map(renderTodo).join("\n");
+    todoListContainer.innerHTML = store.sortedTodos.map(renderTodo).join('\n');
   }
 }
-const todoView = new TodoView();
+new TodoView();
 
 class SortView {
   private sortContainer: HTMLDivElement;
 
   constructor() {
-    this.sortContainer = document.getElementById("sort") as HTMLDivElement;
+    this.sortContainer = document.getElementById('sort') as HTMLDivElement;
 
-    this.sortContainer
-      .querySelector("#sortSelect")!
-      .addEventListener("change", (e) => {
-        console.log(e);
-        const text = (e.target as HTMLSelectElement).value as Sort["text"];
-        store.updateSort({ text: text });
-      });
+    this.sortContainer.querySelector('#sortSelect')!.addEventListener('change', (e) => {
+      console.log(e);
+      const text = (e.target as HTMLSelectElement).value as Sort['text'];
+      store.updateSort({ text: text });
+    });
   }
 }
 
